@@ -245,6 +245,24 @@ async function autoOrganizeTabs() {
     domainTabs.get(domain).push(tab);
   });
 
+  // Handle empty tabs - keep max 2, pin first one
+  if (emptyTabs.length > 0) {
+    // Keep first tab and pin it
+    await chrome.tabs.update(emptyTabs[0].id, { pinned: true });
+    
+    // Position second tab next to the pinned one if it exists
+    if (emptyTabs.length > 1) {
+      await chrome.tabs.move(emptyTabs[1].id, { index: 1 });
+    }
+    
+    // Remove any additional tabs beyond 2
+    if (emptyTabs.length > 2) {
+      const tabsToClose = emptyTabs.slice(2);
+      await Promise.all(tabsToClose.map(tab => chrome.tabs.remove(tab.id)));
+      emptyTabs.length = 2; // Keep only first two tabs
+    }
+  }
+
   // Clear all columns
   document.querySelectorAll('.stack-content').forEach(stack => {
     stack.innerHTML = '';
