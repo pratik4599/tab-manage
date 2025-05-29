@@ -1,7 +1,107 @@
+let searchQuery = '';
+let currentHighlight = -1;
+let searchResults = [];
+
 document.addEventListener('DOMContentLoaded', function() {
   // Auto-organize tabs when page loads
   autoOrganizeTabs();
+  
+  // Setup search functionality
+  setupSearch();
 });
+
+// Setup search functionality
+function setupSearch() {
+  document.addEventListener('keydown', async (e) => {
+    // Ignore if user is typing in an input field
+    if (e.target.tagName === 'INPUT') return;
+    
+    if (e.key === 'Escape') {
+      // Clear search
+      searchQuery = '';
+      currentHighlight = -1;
+      searchResults = [];
+      clearHighlights();
+      return;
+    }
+    
+    if (e.key === 'Enter' && searchResults.length > 0) {
+      // Activate highlighted tab
+      const tabId = searchResults[currentHighlight];
+      await chrome.tabs.update(tabId, { active: true });
+      window.close();
+      return;
+    }
+    
+    if (e.key === 'ArrowDown' && searchResults.length > 0) {
+      e.preventDefault();
+      currentHighlight = (currentHighlight + 1) % searchResults.length;
+      highlightTab(searchResults[currentHighlight]);
+      return;
+    }
+    
+    if (e.key === 'ArrowUp' && searchResults.length > 0) {
+      e.preventDefault();
+      currentHighlight = (currentHighlight - 1 + searchResults.length) % searchResults.length;
+      highlightTab(searchResults[currentHighlight]);
+      return;
+    }
+    
+    // Handle typing
+    if (e.key.length === 1 || e.key === 'Backspace') {
+      if (e.key === 'Backspace') {
+        searchQuery = searchQuery.slice(0, -1);
+      } else {
+        searchQuery += e.key.toLowerCase();
+      }
+      
+      await updateSearch();
+    }
+  });
+}
+
+// Update search results
+async function updateSearch() {
+  clearHighlights();
+  
+  if (!searchQuery) {
+    currentHighlight = -1;
+    searchResults = [];
+    return;
+  }
+  
+  const tabs = await chrome.tabs.query({});
+  searchResults = tabs
+    .filter(tab => {
+      const title = tab.title.toLowerCase();
+      const url = tab.url.toLowerCase();
+      return title.includes(searchQuery) || url.includes(searchQuery);
+    })
+    .map(tab => tab.id);
+  
+  if (searchResults.length > 0) {
+    currentHighlight = 0;
+    highlightTab(searchResults[0]);
+  }
+}
+
+// Clear all highlights
+function clearHighlights() {
+  document.querySelectorAll('.tab-item.highlight').forEach(el => {
+    el.classList.remove('highlight');
+  });
+}
+
+// Highlight a specific tab
+function highlightTab(tabId) {
+  clearHighlights();
+  
+  const tabElement = document.querySelector(`[data-tab-id="${tabId}"]`);
+  if (tabElement) {
+    tabElement.classList.add('highlight');
+    tabElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
 
 // Create a tab element
 function createTabElement(tab, container) {

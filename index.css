@@ -16,6 +16,11 @@ body {
   padding: 20px;
 }
 
+.tab-item.highlight {
+  background: #e3f2fd;
+  border-color: #3498db;
+}
+
 .stacks-container {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
