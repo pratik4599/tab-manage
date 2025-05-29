@@ -228,9 +228,16 @@ function findOrCreateColumn(stack, domain) {
 async function autoOrganizeTabs() {
   const tabs = await chrome.tabs.query({});
   const domainTabs = new Map(); // Track tabs by domain
+  const emptyTabs = []; // Track empty/new tabs
   
   // First, group all tabs by domain
   tabs.forEach(tab => {
+    // Check if it's an empty/new tab
+    if (tab.title === 'New Tab' || tab.title === '' || tab.url === 'chrome://newtab/') {
+      emptyTabs.push(tab);
+      return;
+    }
+
     const domain = new URL(tab.url).hostname;
     if (!domainTabs.has(domain)) {
       domainTabs.set(domain, []);
@@ -243,8 +250,10 @@ async function autoOrganizeTabs() {
     stack.innerHTML = '';
   });
   
-  // Column 1: Single domain tabs
+  // Column 1: Single domain tabs and one empty tab
   const stack1 = document.querySelector('[data-stack="1"]');
+  
+  // Add single domain tabs
   const singleDomainTabs = [];
   domainTabs.forEach((tabs, domain) => {
     if (tabs.length === 1) {
@@ -252,6 +261,18 @@ async function autoOrganizeTabs() {
     }
   });
   singleDomainTabs.forEach(tab => createTabElement(tab, stack1));
+  
+  // Add only one empty tab if exists
+  if (emptyTabs.length > 0) {
+    createTabElement(emptyTabs[0], stack1);
+    
+    // Close extra empty tabs
+    if (emptyTabs.length > 1) {
+      emptyTabs.slice(1).forEach(tab => {
+        chrome.tabs.remove(tab.id);
+      });
+    }
+  }
   
   // Get domains with multiple tabs
   const multiTabDomains = Array.from(domainTabs.entries())
