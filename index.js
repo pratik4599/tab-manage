@@ -230,8 +230,17 @@ async function autoOrganizeTabs() {
   const domainTabs = new Map(); // Track tabs by domain
   const emptyTabs = []; // Track empty/new tabs
   
-  // First, group all tabs by domain
+  // First, identify pinned tab and empty tabs
+  const existingPinnedTab = tabs.find(tab => 
+    tab.pinned && (tab.url === 'chrome://newtab/' || tab.url.includes('index.html'))
+  );
+
   tabs.forEach(tab => {
+    // Skip the pinned tab from being counted as empty
+    if (tab.id === existingPinnedTab?.id) {
+      return;
+    }
+
     // Check if it's an empty/new tab
     if (tab.title === 'New Tab' || tab.title === '' || tab.url === 'chrome://newtab/') {
       emptyTabs.push(tab);
@@ -245,21 +254,21 @@ async function autoOrganizeTabs() {
     domainTabs.get(domain).push(tab);
   });
 
-  // Handle empty tabs - keep max 2, pin first one
-  if (emptyTabs.length > 0) {
-    // Keep first tab and pin it
+  // Handle empty tabs and pinned tab
+  if (existingPinnedTab) {
+    // If pinned tab exists, switch to it and close new empty tabs
+    await chrome.tabs.update(existingPinnedTab.id, { active: true });
+    if (emptyTabs.length > 0) {
+      await Promise.all(emptyTabs.map(tab => chrome.tabs.remove(tab.id)));
+    }
+  } else if (emptyTabs.length > 0) {
+    // No pinned tab exists, create one from the first empty tab
     await chrome.tabs.update(emptyTabs[0].id, { pinned: true });
     
-    // Position second tab next to the pinned one if it exists
+    // Remove any additional empty tabs
     if (emptyTabs.length > 1) {
-      await chrome.tabs.move(emptyTabs[1].id, { index: 1 });
-    }
-    
-    // Remove any additional tabs beyond 2
-    if (emptyTabs.length > 2) {
-      const tabsToClose = emptyTabs.slice(2);
+      const tabsToClose = emptyTabs.slice(1);
       await Promise.all(tabsToClose.map(tab => chrome.tabs.remove(tab.id)));
-      emptyTabs.length = 2; // Keep only first two tabs
     }
   }
 
